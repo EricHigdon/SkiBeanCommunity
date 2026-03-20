@@ -38,7 +38,7 @@ void setLedColor(LedColor color) {
     case LED_BLACK: r = 0;  g = 0;  b = 0;  break;
   }
   
-  rgbLedWrite(LED_BUILTIN, g, r, b);
+  rgbLedWrite(LED_BUILTIN, r, g, b);
 }
 
 void handleLED() {
