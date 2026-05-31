@@ -19,7 +19,6 @@
 
 #include <Arduino.h>
 #include <PID_v1.h>
-#include "../lib/SerialDebug.h"
 #include "../lib/SkiBLE.h"
 #include "../lib/SkiLED.h"
 #include "../lib/SkiCMD.h"
@@ -63,10 +62,8 @@ PID myPID(&pInput, &pOutput, &pSetpoint,
 
 void setup() {
     Serial.begin(115200);
-    D_println("Starting HiBean ESP32 BLE Roaster Control.");
+    ESP_LOGI("setup", "Starting HiBean ESP32 BLE Roaster Control.");
     delay(3000); //let fw upload finish before we take over hwcdc serial tx/rx
-
-    D_println("Serial SERIAL_DEBUG ON!");
 
     // set pinmode on tx for commands to roaster, take it high
     pinMode(TX_PIN, OUTPUT);
@@ -74,7 +71,6 @@ void setup() {
 
     // start parser on rx pin for bean temp readings from roaster
     roaster.begin(RX_PIN);
-    roaster.enableDebug(false);
 
     // Start BLE
     initBLE();
@@ -105,7 +101,7 @@ void loop() {
         if(roaster.validate(msg)) {
             temp = roaster.getTemperature(msg);
         } else {
-            D_println("Checksum failed!");
+            ESP_LOGI("loop", "Checksum failed!");
         }
     }
 
