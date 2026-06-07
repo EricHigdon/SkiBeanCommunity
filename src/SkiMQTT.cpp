@@ -17,23 +17,25 @@
 
 #include <PubSubClient.h>
 #include <WiFi.h>
-#include <ArduinoJson.h>
 
 #include "../lib/SkiMQTTConfig.h"
 
-const char* temp_config_topic = "homeassistant/device/mqtt_livingroom/skywalker_01/config";
-const char* temp_state_topic  = "homeassistant/device/mqtt_livingroom/skywalker_01/state";
-
-// Topics for Switch (LED)
-const char* led_config_topic  = "homeassistant/device/mqtt_livingroom/skywalker_01/config";
-const char* led_state_topic   = "homeassistant/device/mqtt_livingroom/skywalker_01/state";
-const char* led_cmd_topic     = MQTT_CMD_TOPIC;
-const char* device_id        = "esp32_controller_01";
-
 namespace {
+const char* HA_DISCOVERY_TOPIC = "homeassistant/switch/device02/relay1/config";
+const String HA_DEVICE_ID = "skywalker_01";
+
 WiFiClient g_wifiClient;
 PubSubClient g_mqttClient(g_wifiClient);
 SkiMQTTCmdHandler g_cmdHandler = nullptr;
+
+void publishHomeAssistantDiscovery() {
+    String device_str = String("{\"name\":\"Skywalker Roaster\"}");
+    String payloadStr = String("{\"name\":\"Living Room Light\",\"unique_id\":\"device02_relay1\",\"state_topic\":\"device02\/relay\/1\/state\",\"command_topic\":\"device02\/relay\/1\/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":" + device_str + "}");
+
+    if (!g_mqttClient.publish(HA_DISCOVERY_TOPIC, payloadStr.c_str(), true)) {
+        ESP_LOGW("SkiMQTT", "Failed to publish Home Assistant discovery payload.");
+    }
+}
 
 void connectWiFi() {
     delay(10);
@@ -66,54 +68,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
-// Send Discovery Config Payloads to Home Assistant
-void send_mqtt_discovery() {
-  // 1. TEMPERATURE SENSOR DISCOVERY
-  JsonDocument<400> tempDoc;
-  tempDoc["name"] = "turned on";
-  tempDoc["state_topic"] = "pump/timestamp_on";
-  tempDoc["device_class"] = "timestamp";
-  tempDoc["value_template"] = "{{ as_datetime(value) }}";
-  tempDoc["unique_id"] = "hp_1231232_ts_on";
-
-  JsonObject device = tempDoc.createNestedObject("device");
-  device["name"] = "Heat pump";
-  JsonArray identifiers = device.createNestedArray("identifiers");
-  identifiers.add(device_id);
-
-  char tempBuffer[400];
-  serializeJson(tempDoc, tempBuffer);
-  g_mqttClient.publish(temp_config_topic, tempBuffer, true); // Retain flag set to true
-  Serial.println("Sent Temperature Discovery!");
-
-//   // 2. SWITCH (LED) DISCOVERY
-//   StaticJsonDocument<400> ledDoc;
-//   ledDoc["name"] = "ESP32 Status LED";
-//   ledDoc["state_topic"] = led_state_topic;
-//   ledDoc["command_topic"] = led_cmd_topic;
-//   ledDoc["unique_id"] = "esp32_mqtt_livingroom_led_01";
-  
-//   // Link to the same device mapping
-//   JsonObject ledDevice = ledDoc.createNestedObject("device");
-//   JsonArray ledIdentifiers = ledDevice.createNestedArray("identifiers");
-//   ledIdentifiers.add(device_id);
-//   ledDevice["name"] = "ESP32 Controller";
-//   ledDevice["model"] = "ESP32 Dev Mode";
-//   ledDevice["manufacturer"] = "DIY";
-
-//   char ledBuffer[400];
-//   serializeJson(ledDoc, ledBuffer);
-//   g_mqttClient.publish(led_config_topic, ledBuffer, true); // Retain flag set to true
-//   Serial.println("Sent LED Discovery!");
-}
-
 void ensureMQTTConnected() {
     while (!g_mqttClient.connected()) {
         Serial.print("Attempting MQTT connection...");
         if (g_mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS)) {
             Serial.println("connected");
             g_mqttClient.subscribe(MQTT_CMD_TOPIC);
-            send_mqtt_discovery(); // Send discovery messages upon connection
+            publishHomeAssistantDiscovery();
         } else {
             Serial.print("failed, rc=");
             Serial.print(g_mqttClient.state());
