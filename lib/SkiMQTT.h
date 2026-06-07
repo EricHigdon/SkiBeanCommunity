@@ -26,6 +26,10 @@ bool mqttPublish(const char* topic, const char* payload, bool retained = false);
 bool mqttPublish(const char* topic, const String& payload, bool retained = false);
 
 bool mqttPublishStatusOnline();
+bool mqttPublishTemperature(double temperatureC);
+bool mqttPublishSetTemperature(double temperatureC);
+bool mqttPublishHeat(double heat);
+bool mqttPublishVent(double vent);
 bool mqttIsConnected();
 
 const char* mqttCmdTopic();

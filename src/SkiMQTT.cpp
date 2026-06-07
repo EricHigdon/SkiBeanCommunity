@@ -17,24 +17,89 @@
 
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <ArduinoJson.h>
 
 #include "../lib/SkiMQTTConfig.h"
 
 namespace {
-const char* HA_DISCOVERY_TOPIC = "homeassistant/switch/device02/relay1/config";
-const String HA_DEVICE_ID = "skywalker_01";
+const char* HA_DISCOVERY_PREFIX = "homeassistant";
 
 WiFiClient g_wifiClient;
 PubSubClient g_mqttClient(g_wifiClient);
 SkiMQTTCmdHandler g_cmdHandler = nullptr;
 
-void publishHomeAssistantDiscovery() {
-    String device_str = String("{\"name\":\"Skywalker Roaster\"}");
-    String payloadStr = String("{\"name\":\"Living Room Light\",\"unique_id\":\"device02_relay1\",\"state_topic\":\"device02\/relay\/1\/state\",\"command_topic\":\"device02\/relay\/1\/set\",\"payload_on\":\"ON\",\"payload_off\":\"OFF\",\"device\":" + device_str + "}");
+String discoveryTopic(const char* component, const char* objectId) {
+    char topic[128];
+    snprintf(topic, sizeof(topic), "%s/%s/%s/config", HA_DISCOVERY_PREFIX, component, objectId);
+    return String(topic);
+}
 
-    if (!g_mqttClient.publish(HA_DISCOVERY_TOPIC, payloadStr.c_str(), true)) {
-        ESP_LOGW("SkiMQTT", "Failed to publish Home Assistant discovery payload.");
-    }
+template <size_t Capacity>
+void addDeviceInfo(StaticJsonDocument<Capacity>& document) {
+    JsonObject device = document.createNestedObject("device");
+    JsonArray identifiers = device.createNestedArray("identifiers");
+    identifiers.add(MQTT_DEVICE_ID);
+    device["name"] = MQTT_DEVICE_NAME;
+    device["manufacturer"] = MQTT_DEVICE_MANUFACTURER;
+    device["model"] = MQTT_DEVICE_MODEL;
+}
+
+template <size_t Capacity>
+void publishDiscoveryMessage(const String& topic, const StaticJsonDocument<Capacity>& document) {
+    String payload;
+    serializeJson(document, payload);
+    g_mqttClient.publish(topic.c_str(), payload.c_str(), true);
+}
+
+void publishTemperatureDiscovery() {
+    StaticJsonDocument<1024> document;
+    document["name"] = "Roaster Temperature";
+    document["unique_id"] = String(MQTT_DEVICE_ID) + "_temperature";
+    document["state_topic"] = MQTT_TEMPERATURE_STATE_TOPIC;
+    document["unit_of_measurement"] = "°C";
+    document["device_class"] = "temperature";
+    document["state_class"] = "measurement";
+    addDeviceInfo(document);
+    publishDiscoveryMessage(discoveryTopic("sensor", "temperature"), document);
+}
+
+void publishSetTemperatureDiscovery() {
+    StaticJsonDocument<1024> document;
+    document["name"] = "Set Temperature";
+    document["unique_id"] = String(MQTT_DEVICE_ID) + "_set_temperature";
+    document["state_topic"] = MQTT_SET_TEMPERATURE_STATE_TOPIC;
+    document["unit_of_measurement"] = "°C";
+    document["device_class"] = "temperature";
+    document["state_class"] = "measurement";
+    addDeviceInfo(document);
+    publishDiscoveryMessage(discoveryTopic("sensor", "set_temperature"), document);
+    mqttPublishSetTemperature(0); // Initialize set temperature state in MQTT
+}
+
+void publishHeatDiscovery() {
+    StaticJsonDocument<1024> document;
+    document["name"] = "Heat";
+    document["unique_id"] = String(MQTT_DEVICE_ID) + "_heat";
+    document["state_topic"] = MQTT_HEAT_STATE_TOPIC;
+    document["unit_of_measurement"] = "%";
+    document["device_class"] = "power_factor";
+    document["state_class"] = "measurement";
+    addDeviceInfo(document);
+    publishDiscoveryMessage(discoveryTopic("sensor", "heat"), document);
+    mqttPublishHeat(0); // Initialize heat state in MQTT
+}
+
+void publishVentDiscovery() {
+    StaticJsonDocument<1024> document;
+    document["name"] = "Vent";
+    document["unique_id"] = String(MQTT_DEVICE_ID) + "_vent";
+    document["state_topic"] = MQTT_VENT_STATE_TOPIC;
+    document["unit_of_measurement"] = "%";
+    document["device_class"] = "power_factor";
+    document["state_class"] = "measurement";
+    addDeviceInfo(document);
+    publishDiscoveryMessage(discoveryTopic("sensor", "vent"), document);
+    mqttPublishVent(0); // Initialize vent state in MQTT
 }
 
 void connectWiFi() {
@@ -49,7 +114,8 @@ void connectWiFi() {
         delay(500);
         Serial.print(".");
     }
-    Serial.println("\nWiFi connected");
+    Serial.println();
+    Serial.println("WiFi connected");
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -68,13 +134,22 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
+void send_mqtt_discovery() {
+    publishTemperatureDiscovery();
+    publishSetTemperatureDiscovery();
+    publishHeatDiscovery();
+    publishVentDiscovery();
+    Serial.println("Sent Home Assistant discovery payloads!");
+}
+
 void ensureMQTTConnected() {
     while (!g_mqttClient.connected()) {
         Serial.print("Attempting MQTT connection...");
+        g_mqttClient.setBufferSize(1024);
         if (g_mqttClient.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS)) {
             Serial.println("connected");
             g_mqttClient.subscribe(MQTT_CMD_TOPIC);
-            publishHomeAssistantDiscovery();
+            send_mqtt_discovery(); // Send discovery messages upon connection
         } else {
             Serial.print("failed, rc=");
             Serial.print(g_mqttClient.state());
@@ -109,6 +184,26 @@ bool mqttPublish(const char* topic, const String& payload, bool retained) {
 
 bool mqttPublishStatusOnline() {
     return mqttPublish(MQTT_STATUS_TOPIC, "online", false);
+}
+
+bool mqttPublishSetTemperature(double temperatureC) {
+    String payload = String(temperatureC, 1);
+    return mqttPublish(MQTT_SET_TEMPERATURE_STATE_TOPIC, payload, true);
+}
+
+bool mqttPublishTemperature(double temperatureC) {
+    String payload = String(temperatureC, 1);
+    return mqttPublish(MQTT_TEMPERATURE_STATE_TOPIC, payload, true);
+}
+
+bool mqttPublishHeat(double heat) {
+    String payload = String(heat, 1);
+    return mqttPublish(MQTT_HEAT_STATE_TOPIC, payload, true);
+}
+
+bool mqttPublishVent(double vent) {
+    String payload = String(vent, 1);
+    return mqttPublish(MQTT_VENT_STATE_TOPIC, payload, true);
 }
 
 bool mqttIsConnected() {

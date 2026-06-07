@@ -84,6 +84,7 @@ void handleCOOL(uint8_t value);
 void eStop();
 void handlePIDControl();
 void setPIDMode(bool usePID);
+bool getPIDMode();
 void setValue(uint8_t* bytePtr, uint8_t value);
 void sendRoasterMessage();
 
@@ -133,6 +134,8 @@ void handleREAD() {
 
     notifyNimBLEClient(readMsg);
     sendRoasterMessage(); // send heartbeat message to roaster
+    mqttPublishHeat(sendBuffer[HEAT_BYTE]); // publish current temperature to MQTT
+    mqttPublishVent(sendBuffer[VENT_BYTE]); // publish current vent to MQTT
     lastEventTime = micros();
 }
 
@@ -215,6 +218,10 @@ void setPIDMode(bool usePID) {
     }
 }
 
+bool getPIDMode() {
+    return (myPID.GetMode() == AUTOMATIC);
+}
+
 void parseAndExecuteCommands(String input) {
     input.trim();
     input.toUpperCase();
@@ -249,10 +256,14 @@ void parseAndExecuteCommands(String input) {
             setPIDMode(true);  // Enable PID control
         } else if (param == "OFF") {
             setPIDMode(false); // Disable PID control
+            mqttPublishSetTemperature(0); // Reset set temperature in MQTT when PID is turned off
         } else if (subcommand == "SV") {
             double newSetpoint = param.toDouble();
             if (newSetpoint > 0 && newSetpoint <= 300) {  // Example range check
                 pSetpoint = newSetpoint;
+                if (getPIDMode()) {
+                    mqttPublishSetTemperature(pSetpoint); // publish new setpoint to MQTT
+                }
                 ESP_LOGI("SkiCMD", "New Setpoint: %f", pSetpoint);
             }
         } else if (subcommand == "T") {

@@ -88,6 +88,7 @@ void setup() {
 
     initMQTT(parseAndExecuteCommands);
     mqttPublishStatusOnline();
+    mqttPublishTemperature(temp);
     digitalWrite(LED_BUILTIN, HIGH); // Ensure LED pin is high
 
     shutdown();
@@ -104,6 +105,7 @@ void loop() {
 
         if(roaster.validate(msg)) {
             temp = roaster.getTemperature(msg);
+            mqttPublishTemperature(temp);
         } else {
             ESP_LOGI("loop", "Checksum failed!");
         }

@@ -26,6 +26,16 @@ static const char* MQTT_USER = "eric.s.higdon@gmail.com";
 static const char* MQTT_PASS = "eriQ2930";
 static const char* MQTT_CLIENT_ID = "ESP32_Backyard_Client";
 
+// Home Assistant Device Identity
+static const char* MQTT_DEVICE_ID = "skywalker_01";
+static const char* MQTT_DEVICE_NAME = "Skywalker Roaster";
+static const char* MQTT_DEVICE_MANUFACTURER = "HiBean Community";
+static const char* MQTT_DEVICE_MODEL = "Skywalker v1";
+
 // Default Topics
-static const char* MQTT_CMD_TOPIC = "esp32/backyard/led/cmd";
+static const char* MQTT_CMD_TOPIC = "skywalker/cmd";
 static const char* MQTT_STATUS_TOPIC = "skywalker/status";
+static const char* MQTT_SET_TEMPERATURE_STATE_TOPIC = "skywalker/set_temperature/state";
+static const char* MQTT_TEMPERATURE_STATE_TOPIC = "skywalker/temperature/state";
+static const char* MQTT_HEAT_STATE_TOPIC = "skywalker/heat/state";
+static const char* MQTT_VENT_STATE_TOPIC = "skywalker/vent/state";
