@@ -24,6 +24,7 @@
 #include "../lib/SkiCMD.h"
 #include "../lib/SkiPIDConfig.h"
 #include "../lib/SkiParser.h"
+#include "../lib/SkiMQTT.h"
 
 // -----------------------------------------------------------------------------
 // Current Sketch and Release Version (for BLE device info)
@@ -67,7 +68,6 @@ void setup() {
 
     // set pinmode on tx for commands to roaster, take it high
     pinMode(TX_PIN, OUTPUT);
-    digitalWrite(TX_PIN, HIGH);
 
     // start parser on rx pin for bean temp readings from roaster
     roaster.begin(RX_PIN);
@@ -85,6 +85,10 @@ void setup() {
     // Ensure heat starts at 0% for safety
     manualHeatLevel = 0;
     handleHEAT(manualHeatLevel);
+
+    initMQTT(parseAndExecuteCommands);
+    mqttPublishStatusOnline();
+    digitalWrite(LED_BUILTIN, HIGH); // Ensure LED pin is high
 
     shutdown();
 }
@@ -117,4 +121,7 @@ void loop() {
     
     // update the led so user knows we're running
     handleLED();
+
+    mqttLoop();
+
 }

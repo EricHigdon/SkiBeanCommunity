@@ -14,6 +14,7 @@
  */
 
 #include "PID_v1.h"
+#include "SkiMQTT.h"
 // -----------------------------------------------------------------------------
 // All HiBean commands TO roaster
 // -----------------------------------------------------------------------------
@@ -236,6 +237,11 @@ void parseAndExecuteCommands(String input) {
         }
     } else {
         command = input;
+    }
+    
+    if (command != "READ") {
+        String topic = String("skywalker/command/") + command + String("/requested/");
+        mqttPublish(topic.c_str(), param.c_str(), false);
     }
 
     if (command == "PID") {
